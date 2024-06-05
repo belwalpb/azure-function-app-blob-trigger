@@ -1,7 +1,3 @@
-const readline = require('readline');
-const { Readable } = require('stream');
-const { MongoClient } = require('mongodb');
-
 module.exports = async function (context, myBlob) {
     const stream = Readable.from(myBlob.toString());
     const lineReader = readline.createInterface({ input: stream });
@@ -10,13 +6,24 @@ module.exports = async function (context, myBlob) {
     await client.connect();
     const collection = client.db(process.env.MONGODB_DB_NAME).collection(process.env.MONGODB_COLLECTION_NAME);
 
+    let records = [];
     for await (const line of lineReader) {
         const record = line.split(','); // assuming CSV without quotes
-        await collection.insertOne({
+        records.push({
             column1: record[0], // replace with your column names
             column2: record[1],
             // ...
         });
+
+        if (records.length === 100) {
+            await collection.insertMany(records);
+            records = [];
+        }
+    }
+
+    // Insert remaining records if they are less than 100
+    if (records.length > 0) {
+        await collection.insertMany(records);
     }
 
     await client.close();
