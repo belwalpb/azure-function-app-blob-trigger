@@ -1,6 +1,7 @@
+const { MongoClient } = require('mongodb');
 const { BlobServiceClient } = require('@azure/storage-blob');
 
-module.exports = async function (context, myBlob, myInputBlob) {
+module.exports = async function (context, myBlob) {
     const stream = Readable.from(myBlob.toString());
     const lineReader = readline.createInterface({ input: stream });
 
@@ -8,24 +9,32 @@ module.exports = async function (context, myBlob, myInputBlob) {
     await client.connect();
     const collection = client.db(process.env.MONGODB_DB_NAME).collection(process.env.MONGODB_COLLECTION_NAME);
 
-    let records = [];
+    let operations = [];
     for await (const line of lineReader) {
         const record = line.split(','); // assuming CSV without quotes
-        records.push({
-            column1: record[0], // replace with your column names
-            column2: record[1],
-            // ...
+        operations.push({
+            updateOne: {
+                filter: { uniqueField: record[0] }, // replace 'uniqueField' with your unique field name
+                update: {
+                    $set: {
+                        column1: record[0], // replace with your column names
+                        column2: record[1],
+                        // ...
+                    }
+                },
+                upsert: true
+            }
         });
 
-        if (records.length === 100) {
-            await collection.insertMany(records);
-            records = [];
+        if (operations.length === 100) {
+            await collection.bulkWrite(operations);
+            operations = [];
         }
     }
 
-    // Insert remaining records if they are less than 100
-    if (records.length > 0) {
-        await collection.insertMany(records);
+    // Insert/Update remaining records if they are less than 100
+    if (operations.length > 0) {
+        await collection.bulkWrite(operations);
     }
 
     await client.close();
@@ -35,8 +44,8 @@ module.exports = async function (context, myBlob, myInputBlob) {
     const containerClient = blobServiceClient.getContainerClient('migration');
 
     const timestamp = Date.now();
-    const oldBlobName = `input/${myInputBlob}`;
-    const newBlobName = `backup/${path.basename(myInputBlob, '.csv')}_${timestamp}.csv`;
+    const oldBlobName = `input/${context.bindingData.name}.csv`;
+    const newBlobName = `backup/${context.bindingData.name}_${timestamp}.csv`;
 
     // Copy the blob
     const newBlobClient = containerClient.getBlobClient(newBlobName);
