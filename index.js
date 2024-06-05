@@ -1,4 +1,6 @@
-module.exports = async function (context, myBlob) {
+const { BlobServiceClient } = require('@azure/storage-blob');
+
+module.exports = async function (context, myBlob, myInputBlob) {
     const stream = Readable.from(myBlob.toString());
     const lineReader = readline.createInterface({ input: stream });
 
@@ -27,4 +29,20 @@ module.exports = async function (context, myBlob) {
     }
 
     await client.close();
+
+    // Move the blob in Azure Blob Storage
+    const blobServiceClient = BlobServiceClient.fromConnectionString(process.env.AZURE_STORAGE_CONNECTION_STRING);
+    const containerClient = blobServiceClient.getContainerClient('migration');
+
+    const timestamp = Date.now();
+    const oldBlobName = `input/${myInputBlob}`;
+    const newBlobName = `backup/${path.basename(myInputBlob, '.csv')}_${timestamp}.csv`;
+
+    // Copy the blob
+    const newBlobClient = containerClient.getBlobClient(newBlobName);
+    const copyResponse = await newBlobClient.beginCopyFromURL(containerClient.getBlobClient(oldBlobName).url);
+    await copyResponse.pollUntilDone();
+
+    // Delete the original blob
+    await containerClient.deleteBlob(oldBlobName);
 };
