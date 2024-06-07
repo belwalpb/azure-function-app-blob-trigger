@@ -2,6 +2,14 @@ const { MongoClient } = require('mongodb');
 const { BlobServiceClient } = require('@azure/storage-blob');
 
 module.exports = async function (context, myBlob) {
+
+    const blobServiceClient = BlobServiceClient.fromConnectionString(process.env.AZURE_STORAGE_CONNECTION_STRING);
+    const containerClient = blobServiceClient.getContainerClient('migration');
+    const blockBlobClient = containerClient.getBlockBlobClient(context.bindingData.name);
+
+    const downloadFilePath = `./${context.bindingData.name}`;
+    await blockBlobClient.downloadToFile(downloadFilePath);
+    
     const stream = Readable.from(myBlob.toString());
     const lineReader = readline.createInterface({ input: stream });
 
