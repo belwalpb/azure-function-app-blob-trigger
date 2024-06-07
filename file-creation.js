@@ -4,7 +4,8 @@ const fs = require('fs');
 const path = require('path');
 const { randomBytes } = require('crypto');
 
-const filePath= "C://Users//user//Desktop//file.txt";
+const fileName = "myFile.txt"; 
+const filePath = path.join(__dirname, fileName);
 
 const start=1;
 const end= 10000;
