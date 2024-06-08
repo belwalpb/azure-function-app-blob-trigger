@@ -1,5 +1,7 @@
 const { MongoClient } = require('mongodb');
 const { BlobServiceClient } = require('@azure/storage-blob');
+const os = require('os');
+const path = require('path');
 
 module.exports = async function (context, myBlob) {
 
@@ -7,7 +9,7 @@ module.exports = async function (context, myBlob) {
     const containerClient = blobServiceClient.getContainerClient('migration');
     const blockBlobClient = containerClient.getBlockBlobClient(context.bindingData.name);
 
-    const downloadFilePath = `./${context.bindingData.name}`;
+    const downloadFilePath = path.join(os.tmpdir(), context.bindingData.name);
     await blockBlobClient.downloadToFile(downloadFilePath);
     
     const stream = Readable.from(myBlob.toString());
